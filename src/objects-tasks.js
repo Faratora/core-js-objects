@@ -385,33 +385,127 @@ function group(array, keySelector, valueSelector) {
  *  For more examples see unit tests.
  */
 
+const DUPLICATE_PARTS_ERROR =
+  'Element, id and pseudo-element should not occur more than one time inside the selector';
+
+const WRONG_ORDER_ERROR =
+  'Selector parts should be arranged in the following order: element, id, class, attribute, pseudo-class, pseudo-element';
+
+const PART_ORDER = {
+  element: 0,
+  id: 1,
+  class: 2,
+  attr: 3,
+  pseudoClass: 4,
+  pseudoElement: 5,
+};
+
+const PART_PREFIX = {
+  element: '',
+  id: '#',
+  class: '.',
+  attr: '[',
+  pseudoClass: ':',
+  pseudoElement: '::',
+};
+
+const PART_SUFFIX = {
+  attr: ']',
+};
+
+function createSelector() {
+  return {
+    value: '',
+    simple: true,
+    lastOrder: -1,
+    firstOrder: Number.MAX_SAFE_INTEGER,
+    usedParts: [],
+    stringify() {
+      return this.value;
+    },
+    withPart(part, name) {
+      const order = PART_ORDER[part];
+      const addition = `${PART_PREFIX[part]}${name}${PART_SUFFIX[part] || ''}`;
+
+      if (
+        ['element', 'id', 'pseudoElement'].includes(part) &&
+        this.usedParts.includes(part)
+      ) {
+        throw new Error(DUPLICATE_PARTS_ERROR);
+      }
+
+      if (this.simple && order < this.lastOrder) {
+        throw new Error(WRONG_ORDER_ERROR);
+      }
+
+      return {
+        ...this,
+        value: `${this.value}${addition}`,
+        lastOrder: Math.max(this.lastOrder, order),
+        firstOrder: Math.min(this.firstOrder, order),
+        usedParts: [...this.usedParts, part],
+      };
+    },
+    element(value) {
+      return this.withPart('element', value);
+    },
+    id(value) {
+      return this.withPart('id', value);
+    },
+    class(value) {
+      return this.withPart('class', value);
+    },
+    attr(value) {
+      return this.withPart('attr', value);
+    },
+    pseudoClass(value) {
+      return this.withPart('pseudoClass', value);
+    },
+    pseudoElement(value) {
+      return this.withPart('pseudoElement', value);
+    },
+    combine(selector, combinator, secondSelector) {
+      const separator = combinator === ' ' ? '   ' : ` ${combinator} `;
+
+      return {
+        ...createSelector(),
+        value: `${selector.value}${separator}${secondSelector.value}`,
+        simple: false,
+        lastOrder: secondSelector.lastOrder,
+        firstOrder: secondSelector.firstOrder,
+        usedParts: [...secondSelector.usedParts],
+      };
+    },
+  };
+}
+
 const cssSelectorBuilder = {
-  element(/* value */) {
-    throw new Error('Not implemented');
+  element(value) {
+    return createSelector().element(value);
   },
 
-  id(/* value */) {
-    throw new Error('Not implemented');
+  id(value) {
+    return createSelector().id(value);
   },
 
-  class(/* value */) {
-    throw new Error('Not implemented');
+  class(value) {
+    return createSelector().class(value);
   },
 
-  attr(/* value */) {
-    throw new Error('Not implemented');
+  attr(value) {
+    return createSelector().attr(value);
   },
 
-  pseudoClass(/* value */) {
-    throw new Error('Not implemented');
+  pseudoClass(value) {
+    return createSelector().pseudoClass(value);
   },
 
-  pseudoElement(/* value */) {
-    throw new Error('Not implemented');
+  pseudoElement(value) {
+    return createSelector().pseudoElement(value);
   },
 
-  combine(/* selector1, combinator, selector2 */) {
-    throw new Error('Not implemented');
+  combine(selector1, combinator, selector2) {
+    return createSelector().combine(selector1, combinator, selector2);
   },
 };
 
